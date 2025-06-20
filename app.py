@@ -46,4 +46,4 @@ if uploaded_file:
     else:
         # ---- Step 4: Clean data ----
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df =
+        df = pd.read_csv(uploaded_file)
