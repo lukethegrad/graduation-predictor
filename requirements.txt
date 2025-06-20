@@ -4,6 +4,6 @@ matplotlib
 streamlit
 pandas
 numpy
-tensorflow==2.12.0
+tensorflow==2.11.0
 joblib
 h5py
