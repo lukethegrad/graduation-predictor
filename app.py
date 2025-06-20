@@ -3,7 +3,7 @@ import pandas as pd
 
 st.title("🎧 GRADUATION* Streaming Predictor")
 
-# ---- Step 1: File Upload ----
+# ---- Step 1: Upload file ----
 uploaded_file = st.file_uploader("📂 Upload your streaming CSV", type="csv")
 
 if uploaded_file:
@@ -12,26 +12,20 @@ if uploaded_file:
     st.subheader("📋 Raw Uploaded Data")
     st.dataframe(df.head())
 
-    # ---- Step 2: Auto-detect and clean known stream report formats ----
-    # If file has Artist, Title, Streams, Date — assume raw format
-    raw_format_cols = {"artist", "title", "streams", "date"}
-    normalized_cols = [col.strip().lower().replace(" ", "_") for col in df.columns]
-    df.columns = normalized_cols
+    # ---- Step 2: Normalize column names ----
+    original_cols = df.columns.tolist()
+    df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
+    st.caption(f"🔍 Standardized columns: {original_cols} → {df.columns.tolist()}")
 
-    if raw_format_cols.issubset(set(normalized_cols)):
-        st.caption("📦 Detected raw distributor format. Auto-cleaning...")
+    # ---- Step 3: Detect known raw format ----
+    if {"artist", "title", "streams", "date"}.issubset(df.columns):
+        st.caption("📦 Detected raw distributor format — cleaning now...")
 
-        # Combine artist and title into a track_id
         df["track_id"] = df["artist"].str.strip() + " - " + df["title"].str.strip()
-
-        # Rename streams and date
         df.rename(columns={"streams": "daily_streams"}, inplace=True)
+        df = df[["track_id", "date", "daily_streams"]]
 
-        # Drop other irrelevant columns
-        keep_cols = ["track_id", "date", "daily_streams"]
-        df = df[keep_cols]
-
-    # ---- Step 3: Normalize columns ----
+    # ---- Step 4: Column name mapping fallback (alias support) ----
     column_mapping = {
         "trackid": "track_id",
         "track": "track_id",
@@ -46,16 +40,15 @@ if uploaded_file:
     }
     df.rename(columns={col: column_mapping.get(col, col) for col in df.columns}, inplace=True)
 
-    # Validate required columns
+    # ---- Step 5: Validate final structure ----
     required_cols = {"track_id", "date", "daily_streams"}
     if not required_cols.issubset(df.columns):
-        st.error(f"❌ Your file must include columns: {required_cols}")
+        st.error(f"❌ Could not find required columns after cleaning. Found: {df.columns.tolist()}")
     else:
-        # ---- Step 4: Clean types ----
+        # ---- Step 6: Clean and prepare ----
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
         df = df.dropna(subset=["date", "daily_streams", "track_id"])
 
-        # ---- Step 5: Normalize + fill gaps ----
         cleaned_list = []
         for track_id, track_df in df.groupby("track_id"):
             track_df = track_df.sort_values("date").copy()
@@ -72,7 +65,7 @@ if uploaded_file:
         st.subheader("🧼 Cleaned & Normalized Data")
         st.dataframe(df_cleaned.head(20))
 
+        # Download + save
         csv_download = df_cleaned.to_csv(index=False).encode("utf-8")
         st.download_button("📥 Download Cleaned CSV", csv_download, file_name="cleaned_streaming_data.csv")
-
         st.session_state["cleaned_data"] = df_cleaned
