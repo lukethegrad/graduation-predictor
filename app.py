@@ -44,3 +44,6 @@ if uploaded_file:
     if not required_cols.issubset(df.columns):
         st.error(f"❌ Your file must include columns: {required_cols}")
     else:
+        # ---- Step 4: Clean data ----
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df =
