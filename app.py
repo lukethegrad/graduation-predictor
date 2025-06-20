@@ -98,12 +98,23 @@ if uploaded_file:
                 prediction = predict_all_quantiles(sequence, current_total)
                 if prediction:
                     horizons = [14, 30, 90, 180, 365]
-                    result_df = pd.DataFrame({
-                        "Horizon (days)": horizons,
-                        "P10 Prediction": prediction["P10"].astype(int),
-                        "P50 Prediction": prediction["P50"].astype(int),
-                        "P90 Prediction": prediction["P90"].astype(int),
-                    })
+p10_forecast = prediction["P10"]
+p50_forecast = prediction["P50"]
+p90_forecast = prediction["P90"]
+
+current_total = df_cleaned["cumulative_streams"].iloc[-1]
+
+result_df = pd.DataFrame({
+    "Horizon (days)": horizons,
+    "Streams So Far": [int(current_total)] * len(horizons),
+    "Predicted Growth (P10)": (p10_forecast - current_total).astype(int),
+    "Predicted Growth (P50)": (p50_forecast - current_total).astype(int),
+    "Predicted Growth (P90)": (p90_forecast - current_total).astype(int),
+    "Total Predicted (P10)": p10_forecast.astype(int),
+    "Total Predicted (P50)": p50_forecast.astype(int),
+    "Total Predicted (P90)": p90_forecast.astype(int),
+})
+
 
                     st.dataframe(result_df)
                     st.download_button("📥 Download Predictions", result_df.to_csv(index=False), file_name="streaming_predictions.csv")
