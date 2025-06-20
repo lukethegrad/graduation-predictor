@@ -50,18 +50,28 @@ if uploaded_file:
         cleaned_list = []
         for track_id, track_df in df.groupby("track_id"):
             track_df = track_df.sort_values("date").copy()
-            track_df = track_df[["date", "daily_streams"]]  # just the needed fields
+            track_df = track_df[["date", "daily_streams"]]
 
-            # Get start and end date
-            first_date = track_df["date"].min()
+            # Get first known valid stream (non-null, non-zero)
+            valid_rows = track_df[track_df["daily_streams"].notna() & (track_df["daily_streams"] > 0)]
+            if valid_rows.empty:
+                continue  # no valid data
+
+            first_row = valid_rows.iloc[0]
+            first_date = first_row["date"]
+            first_value = first_row["daily_streams"]
             last_date = track_df["date"].max()
-            full_dates = pd.DataFrame({"date": pd.date_range(start=first_date, end=last_date)})
 
-            # Merge in the known data
+            full_dates = pd.DataFrame({"date": pd.date_range(start=first_date, end=last_date)})
             merged = pd.merge(full_dates, track_df, on="date", how="left")
 
-            # Interpolate only AFTER merge — so first value is preserved
+            # Force-set the first known stream value
+            merged.loc[merged["date"] == first_date, "daily_streams"] = first_value
+
+            # Interpolate gaps AFTER first row
             merged["daily_streams"] = merged["daily_streams"].interpolate(method="linear")
+
+            # Fill track_id and day counter
             merged["track_id"] = track_id
             merged["day"] = range(1, len(merged) + 1)
 
