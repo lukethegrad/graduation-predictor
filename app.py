@@ -58,18 +58,22 @@ if uploaded_file:
         for track_id, track_df in df.groupby("track_id"):
             track_df = track_df.sort_values("date").copy()
 
-            # Drop all rows before the first known streaming day
-            track_df = track_df.dropna(subset=["daily_streams"])
+            # Identify first valid streaming day
+            first_stream_date = track_df[track_df["daily_streams"].notna()]["date"].min()
+            last_stream_date = track_df["date"].max()
 
-            # Full daily date range from first real streaming day to last
-            full_range = pd.date_range(start=track_df["date"].min(), end=track_df["date"].max())
+            # Filter to real streaming window
+            track_df = track_df[(track_df["date"] >= first_stream_date) & (track_df["date"] <= last_stream_date)]
 
-            # Reindex to fill missing days between first and last streaming dates
+            # Create full date range
+            full_range = pd.date_range(start=first_stream_date, end=last_stream_date)
+
+            # Reindex to fill gaps between valid streaming days
             track_df = track_df.set_index("date").reindex(full_range)
             track_df["track_id"] = track_id
             track_df["daily_streams"] = track_df["daily_streams"].interpolate(method="linear")
 
-            # Reset index and assign day number
+            # Reset index and assign day count
             track_df = track_df.reset_index().rename(columns={"index": "date"})
             track_df["day"] = range(1, len(track_df) + 1)
 
