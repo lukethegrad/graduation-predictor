@@ -58,25 +58,30 @@ if uploaded_file:
         for track_id, track_df in df.groupby("track_id"):
             track_df = track_df.sort_values("date").copy()
 
-            # Identify first valid streaming day
-            first_stream_date = track_df[track_df["daily_streams"].notna()]["date"].min()
-            last_stream_date = track_df["date"].max()
+            # Step 1: Find the first row with a real stream value
+            known_streams = track_df[track_df["daily_streams"].notna()]
+            if known_streams.empty:
+                continue  # skip if no data
 
-            # Filter to real streaming window
-            track_df = track_df[(track_df["date"] >= first_stream_date) & (track_df["date"] <= last_stream_date)]
+            first_valid_date = known_streams["date"].min()
+            last_valid_date = track_df["date"].max()
 
-            # Create full date range
-            full_range = pd.date_range(start=first_stream_date, end=last_stream_date)
+            # Step 2: Trim to valid window
+            track_df = track_df[(track_df["date"] >= first_valid_date) & (track_df["date"] <= last_valid_date)]
 
-            # Reindex to fill gaps between valid streaming days
+            # Step 3: Reindex from that first valid date forward
+            full_range = pd.date_range(start=first_valid_date, end=last_valid_date)
             track_df = track_df.set_index("date").reindex(full_range)
+
+            # Ensure we don't interpolate the first value — carry it forward manually
+            if pd.isna(track_df.iloc[0]["daily_streams"]):
+                first_known_value = known_streams[known_streams["date"] == first_valid_date]["daily_streams"].values[0]
+                track_df.iloc[0, track_df.columns.get_loc("daily_streams")] = first_known_value
+
             track_df["track_id"] = track_id
             track_df["daily_streams"] = track_df["daily_streams"].interpolate(method="linear")
-
-            # Reset index and assign day count
             track_df = track_df.reset_index().rename(columns={"index": "date"})
             track_df["day"] = range(1, len(track_df) + 1)
-
             cleaned_list.append(track_df)
 
         df_cleaned = pd.concat(cleaned_list, ignore_index=True)
