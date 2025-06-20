@@ -1,9 +1,6 @@
-tensorflow
-scikit-learn
-matplotlib
-streamlit
+streamlit>=1.22
 pandas
 numpy
+scikit-learn
 tensorflow==2.11.0
-joblib
-h5py
+protobuf==3.20.3
