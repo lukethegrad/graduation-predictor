@@ -1,3 +1,5 @@
+from predict import prepare_sequence_for_prediction, predict_all_quantiles
+
 import streamlit as st
 import pandas as pd
 
@@ -22,17 +24,9 @@ if uploaded_file:
         df = df[["track_id", "date", "daily_streams"]]
 
     column_mapping = {
-        "trackid": "track_id",
-        "track": "track_id",
-        "song": "track_id",
-        "trackname": "track_id",
-        "plays": "daily_streams",
-        "stream_count": "daily_streams",
-        "streams": "daily_streams",
-        "daily": "daily_streams",
-        "date_uploaded": "date",
-        "stream_date": "date",
-        "timestamp": "date"
+        "trackid": "track_id", "track": "track_id", "song": "track_id", "trackname": "track_id",
+        "plays": "daily_streams", "stream_count": "daily_streams", "streams": "daily_streams", "daily": "daily_streams",
+        "date_uploaded": "date", "stream_date": "date", "timestamp": "date"
     }
     df.rename(columns={col: column_mapping.get(col, col) for col in df.columns}, inplace=True)
 
@@ -52,10 +46,9 @@ if uploaded_file:
             track_df = track_df.sort_values("date").copy()
             track_df = track_df[["date", "daily_streams"]]
 
-            # Get first known valid stream (non-null, non-zero)
             valid_rows = track_df[track_df["daily_streams"].notna() & (track_df["daily_streams"] > 0)]
             if valid_rows.empty:
-                continue  # no valid data
+                continue
 
             first_row = valid_rows.iloc[0]
             first_date = first_row["date"]
@@ -65,13 +58,8 @@ if uploaded_file:
             full_dates = pd.DataFrame({"date": pd.date_range(start=first_date, end=last_date)})
             merged = pd.merge(full_dates, track_df, on="date", how="left")
 
-            # Force-set the first known stream value
             merged.loc[merged["date"] == first_date, "daily_streams"] = first_value
-
-            # Interpolate gaps AFTER first row
             merged["daily_streams"] = merged["daily_streams"].interpolate(method="linear")
-
-            # Fill track_id and day counter
             merged["track_id"] = track_id
             merged["day"] = range(1, len(merged) + 1)
 
@@ -79,6 +67,27 @@ if uploaded_file:
 
         df_cleaned = pd.concat(cleaned_list, ignore_index=True)
 
+        # 👇 PREDICTION SECTION STARTS HERE
+        st.subheader("📈 Predicting Total Streams (P10 / P50 / P90)")
+        sequence, current_total = prepare_sequence_for_prediction(df_cleaned)
+
+        if sequence is None:
+            st.warning("⚠️ Not enough data to make a prediction. Please upload at least 14 days of data.")
+        else:
+            prediction = predict_all_quantiles(sequence, current_total)
+            if prediction:
+                horizons = [14, 30, 90, 180, 365]
+                result_df = pd.DataFrame({
+                    "Horizon (days)": horizons,
+                    "P10 Prediction": prediction["P10"].astype(int),
+                    "P50 Prediction": prediction["P50"].astype(int),
+                    "P90 Prediction": prediction["P90"].astype(int),
+                })
+
+                st.dataframe(result_df)
+                st.download_button("📥 Download Predictions", result_df.to_csv(index=False), file_name="streaming_predictions.csv")
+
+        # ✅ Show cleaned data below
         st.subheader("🧼 Cleaned & Normalized Data")
         st.dataframe(df_cleaned.head(20))
 
