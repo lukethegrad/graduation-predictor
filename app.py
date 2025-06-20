@@ -96,13 +96,26 @@ if uploaded_file:
                 st.warning("⚠️ Not enough data to make a prediction. Please upload at least 14 days of data.")
             else:
                 prediction = predict_all_quantiles(sequence, current_total)
-                if prediction:
+                                if prediction:
                     horizons = [14, 30, 90, 180, 365]
-p10_forecast = prediction["P10"]
-p50_forecast = prediction["P50"]
-p90_forecast = prediction["P90"]
+                    p10_forecast = prediction["P10"]
+                    p50_forecast = prediction["P50"]
+                    p90_forecast = prediction["P90"]
 
-current_total = df_cleaned["cumulative_streams"].iloc[-1]
+                    result_df = pd.DataFrame({
+                        "Horizon (days)": horizons,
+                        "Streams So Far": [int(current_total)] * len(horizons),
+                        "Predicted Growth (P10)": (p10_forecast - current_total).astype(int),
+                        "Predicted Growth (P50)": (p50_forecast - current_total).astype(int),
+                        "Predicted Growth (P90)": (p90_forecast - current_total).astype(int),
+                        "Total Predicted (P10)": p10_forecast.astype(int),
+                        "Total Predicted (P50)": p50_forecast.astype(int),
+                        "Total Predicted (P90)": p90_forecast.astype(int),
+                    })
+
+                    st.dataframe(result_df)
+                    st.download_button("📥 Download Predictions", result_df.to_csv(index=False), file_name="streaming_predictions.csv")
+
 
 result_df = pd.DataFrame({
     "Horizon (days)": horizons,
